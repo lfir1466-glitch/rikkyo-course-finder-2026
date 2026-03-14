@@ -18,6 +18,8 @@ from scraper import (
     safe_search, safe_detail, safe_search_with_evaluations,
     search_and_detail, search_and_detail_parallel,
     get_syllabus_detail,
+    natural_search, parse_natural_query,
+    compare_courses, check_schedule_conflicts, build_timetable,
     GAKUBU_MAP, BUNRUI19_MAP, BUNRUI3_MAP, BUNRUI12_MAP, BUNRUI2_MAP,
 )
 
@@ -227,6 +229,29 @@ def cmd_schema(_args):
     _json_out(schema)
 
 
+def cmd_nl_search(args):
+    result = natural_search(args.query, page=args.page)
+    _json_out(result)
+
+
+def cmd_compare(args):
+    codes = [c.strip() for c in args.codes.split(",") if c.strip()]
+    result = compare_courses(codes, nendo=args.year)
+    _json_out(result)
+
+
+def cmd_conflicts(args):
+    courses = json.loads(args.courses)
+    result = check_schedule_conflicts(courses)
+    _json_out(result)
+
+
+def cmd_timetable(args):
+    courses = json.loads(args.courses)
+    result = build_timetable(courses)
+    _json_out(result)
+
+
 def cmd_list_options(_args):
     options = {
         "department (gakubu)": {v: k for k, v in GAKUBU_MAP.items() if k},
@@ -283,6 +308,30 @@ def main():
     sp_sd.add_argument("--keyword", "-k", action="append", help="キーワード")
     sp_sd.add_argument("--top", type=int, default=5, help="Number of results to get details for")
     sp_sd.set_defaults(func=cmd_search_detail)
+
+    # nl-search
+    sp_nl = subparsers.add_parser("nl-search", help="Search using natural language query")
+    sp_nl.add_argument("query", help="Natural language query (e.g. '月曜2限の経済学部の英語')")
+    sp_nl.add_argument("--page", "-p", type=int, default=1, help="Page number")
+    sp_nl.set_defaults(func=cmd_nl_search)
+
+    # compare
+    sp_cmp = subparsers.add_parser("compare", help="Compare multiple courses")
+    sp_cmp.add_argument("--codes", required=True, help="Comma-separated course codes")
+    sp_cmp.add_argument("--year", "-y", default="2025", help="年度")
+    sp_cmp.set_defaults(func=cmd_compare)
+
+    # conflicts
+    sp_conf = subparsers.add_parser("conflicts", help="Check schedule conflicts")
+    sp_conf.add_argument("--courses", required=True,
+                         help='JSON array: [{"code":"A1","name":"Math","schedule":"月1"},...]')
+    sp_conf.set_defaults(func=cmd_conflicts)
+
+    # timetable
+    sp_tt = subparsers.add_parser("timetable", help="Build timetable from courses")
+    sp_tt.add_argument("--courses", required=True,
+                       help='JSON array: [{"code":"A1","name":"Math","schedule":"月1"},...]')
+    sp_tt.set_defaults(func=cmd_timetable)
 
     # schema
     sp_schema = subparsers.add_parser("schema", help="Output API schema as JSON")

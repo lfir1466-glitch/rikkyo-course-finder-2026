@@ -772,3 +772,314 @@ def search_and_detail_parallel(top_n=5, **kwargs):
         return _err("network_error", str(e))
     except Exception as e:
         return _err("parse_error", str(e))
+
+
+# ---------------------------------------------------------------------------
+# Course comparison & schedule conflict detection
+# ---------------------------------------------------------------------------
+
+def compare_courses(codes, nendo="2025", fields=None):
+    """Compare multiple courses side by side.
+
+    Args:
+        codes: list of course codes (e.g. ["AF182", "AF301"])
+        nendo: academic year
+        fields: optional list of detail fields to include. If None, include all.
+
+    Returns structured response with comparison table.
+    """
+    if not codes or len(codes) < 2:
+        return _err("invalid_params", "At least 2 course codes required for comparison")
+    if len(codes) > 10:
+        return _err("invalid_params", "Maximum 10 courses can be compared at once")
+
+    try:
+        # Fetch details in parallel
+        details = {}
+        worker_count = min(6, len(codes))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = {}
+            for code in codes:
+                future = executor.submit(get_syllabus_detail, nendo=nendo, kodo_2=code)
+                futures[future] = code
+            for future in as_completed(futures):
+                code = futures[future]
+                try:
+                    details[code] = future.result()
+                except Exception:
+                    details[code] = None
+
+        # Also get evaluation info
+        evaluations = get_evaluation_batch(nendo, codes)
+
+        # Build comparison
+        comparison = []
+        all_keys = set()
+        for code in codes:
+            if details.get(code):
+                all_keys.update(details[code].keys())
+
+        if fields:
+            all_keys = all_keys.intersection(fields)
+
+        for code in codes:
+            entry = {
+                "code": code,
+                "detail": {},
+                "evaluation": evaluations.get(code),
+            }
+            detail = details.get(code) or {}
+            for key in sorted(all_keys):
+                value = detail.get(key, "")
+                # Convert table-type values to string summary
+                if isinstance(value, dict) and value.get("type") == "table":
+                    rows = value.get("rows", [])
+                    value = "; ".join([" | ".join(row) for row in rows[:5]])
+                entry["detail"][key] = value
+            comparison.append(entry)
+
+        return _ok({
+            "courses": comparison,
+            "fields": sorted(all_keys),
+            "count": len(codes),
+        })
+    except requests.exceptions.RequestException as e:
+        return _err("network_error", str(e))
+    except Exception as e:
+        return _err("parse_error", str(e))
+
+
+def _parse_schedule_slots(schedule_str):
+    """Parse schedule string like '月1/水3' into a set of (day, period) tuples."""
+    slots = set()
+    if not schedule_str:
+        return slots
+    days = {"月": "月", "火": "火", "水": "水", "木": "木", "金": "金", "土": "土"}
+    for part in re.split(r"[/／、,\s]+", schedule_str):
+        part = part.strip()
+        if not part:
+            continue
+        for day_char in days:
+            if day_char in part:
+                periods = re.findall(r"(\d)", part)
+                for p in periods:
+                    slots.add((day_char, p))
+    return slots
+
+
+def check_schedule_conflicts(course_list):
+    """Check for time conflicts among a list of courses.
+
+    Args:
+        course_list: list of dicts, each with at least "code" and "schedule" keys.
+                     Example: [{"code": "AF182", "schedule": "月1"}, {"code": "BX301", "schedule": "月1/水3"}]
+
+    Returns structured response with conflicts found.
+    """
+    if not course_list:
+        return _ok({"conflicts": [], "has_conflicts": False})
+
+    # Parse all schedules
+    parsed = []
+    for course in course_list:
+        code = course.get("code", "unknown")
+        name = course.get("name", "")
+        schedule = course.get("schedule", "")
+        slots = _parse_schedule_slots(schedule)
+        parsed.append({"code": code, "name": name, "schedule": schedule, "slots": slots})
+
+    # Find conflicts
+    conflicts = []
+    for i in range(len(parsed)):
+        for j in range(i + 1, len(parsed)):
+            overlap = parsed[i]["slots"] & parsed[j]["slots"]
+            if overlap:
+                conflicts.append({
+                    "course_a": {"code": parsed[i]["code"], "name": parsed[i]["name"], "schedule": parsed[i]["schedule"]},
+                    "course_b": {"code": parsed[j]["code"], "name": parsed[j]["name"], "schedule": parsed[j]["schedule"]},
+                    "overlapping_slots": [f"{day}{period}" for day, period in sorted(overlap)],
+                })
+
+    return _ok({
+        "conflicts": conflicts,
+        "has_conflicts": len(conflicts) > 0,
+        "total_courses": len(course_list),
+    })
+
+
+def build_timetable(course_list):
+    """Build a weekly timetable grid from a list of courses.
+
+    Args:
+        course_list: list of dicts with "code", "name", "schedule" keys.
+
+    Returns a timetable grid structure.
+    """
+    days = ["月", "火", "水", "木", "金", "土"]
+    periods = ["1", "2", "3", "4", "5", "6"]
+
+    grid = {day: {period: [] for period in periods} for day in days}
+
+    for course in course_list:
+        code = course.get("code", "")
+        name = course.get("name", "")
+        slots = _parse_schedule_slots(course.get("schedule", ""))
+        for day, period in slots:
+            if day in grid and period in grid[day]:
+                grid[day][period].append({"code": code, "name": name})
+
+    # Check for conflicts
+    conflicts = []
+    for day in days:
+        for period in periods:
+            if len(grid[day][period]) > 1:
+                conflicts.append({
+                    "slot": f"{day}{period}",
+                    "courses": grid[day][period],
+                })
+
+    return _ok({
+        "grid": grid,
+        "conflicts": conflicts,
+        "has_conflicts": len(conflicts) > 0,
+    })
+
+
+# ---------------------------------------------------------------------------
+# Natural language query parsing
+# ---------------------------------------------------------------------------
+
+_DAY_NAMES = ["月", "火", "水", "木", "金", "土"]
+
+_CAMPUS_KEYWORDS = {
+    "池袋": "1",
+    "新座": "2",
+}
+
+_FORMAT_KEYWORDS = {
+    "ハイフレックス": "7",
+    "オンデマンド": "5",
+    "オンライン": "3",
+    "対面": "1",
+}
+
+_SEMESTER_KEYWORDS = ["春学期", "秋学期", "通年"]
+
+_PARTICLES = re.compile(r"[のでははがをにと]+$")
+
+
+def parse_natural_query(query):
+    """Parse a free-form Japanese query into structured search parameters."""
+    remaining = query.strip()
+    params = {}
+    schedule_filter = []
+    semester_filter = []
+
+    # --- Campus detection ---
+    for keyword, value in _CAMPUS_KEYWORDS.items():
+        if keyword in remaining:
+            params["bunrui12"] = value
+            remaining = remaining.replace(keyword, "", 1)
+
+    # --- Department detection (longest match first) ---
+    sorted_departments = sorted(GAKUBU_REVERSE.keys(), key=len, reverse=True)
+    for dept_name in sorted_departments:
+        if dept_name in remaining:
+            params["gakubu"] = GAKUBU_REVERSE[dept_name]
+            remaining = remaining.replace(dept_name, "", 1)
+            break
+
+    # --- Format detection (order matters: check longer strings first) ---
+    for keyword, value in _FORMAT_KEYWORDS.items():
+        if keyword in remaining:
+            params["bunrui3"] = value
+            remaining = remaining.replace(keyword, "", 1)
+            break
+
+    # --- Day + period detection ---
+    # Match patterns like 月曜2限, 月2限, 月曜2時限, 月2, 月曜日2限
+    day_period_pattern = re.compile(
+        r"([月火水木金土])曜?日?(\d)[時限]*"
+    )
+    for m in day_period_pattern.finditer(remaining):
+        day = m.group(1)
+        period = m.group(2)
+        schedule_filter.append(f"{day}{period}")
+    remaining = day_period_pattern.sub("", remaining)
+
+    # Match standalone day mentions like 月曜, 月曜日 (no period)
+    day_only_pattern = re.compile(r"([月火水木金土])曜日?")
+    for m in day_only_pattern.finditer(remaining):
+        day = m.group(1)
+        # Only add if we don't already have this day with a period
+        if not any(sf.startswith(day) for sf in schedule_filter):
+            schedule_filter.append(day)
+    remaining = day_only_pattern.sub("", remaining)
+
+    # Match standalone period like 2限, 3時限
+    period_only_pattern = re.compile(r"(\d)[時限]+")
+    for m in period_only_pattern.finditer(remaining):
+        period = m.group(1)
+        # Only add standalone period if no day+period combos exist
+        if not schedule_filter:
+            schedule_filter.append(period)
+    remaining = period_only_pattern.sub("", remaining)
+
+    # --- Semester detection ---
+    for keyword in _SEMESTER_KEYWORDS:
+        if keyword in remaining:
+            semester_filter.append(keyword)
+            remaining = remaining.replace(keyword, "", 1)
+    # Short forms: 春 or 秋 (only if 春学期/秋学期 not already matched)
+    if not semester_filter:
+        if "春" in remaining:
+            semester_filter.append("春学期")
+            remaining = remaining.replace("春", "", 1)
+        if "秋" in remaining:
+            semester_filter.append("秋学期")
+            remaining = remaining.replace("秋", "", 1)
+
+    # --- Remaining text becomes kamokumei ---
+    # Strip particles and whitespace
+    remaining = remaining.strip()
+    remaining = _PARTICLES.sub("", remaining)
+    # Also strip leading particles
+    remaining = re.sub(r"^[のでははがをにと]+", "", remaining)
+    remaining = remaining.strip()
+
+    if remaining:
+        params["kamokumei"] = remaining
+
+    params["schedule_filter"] = schedule_filter
+    params["semester_filter"] = semester_filter
+
+    return params
+
+
+def natural_search(query, page=1):
+    """Search using a natural language query string."""
+    parsed = parse_natural_query(query)
+    schedule_filter = parsed.pop("schedule_filter", [])
+    semester_filter = parsed.pop("semester_filter", [])
+
+    result = search_courses(page=page, **parsed)
+
+    # Apply schedule filter client-side
+    if schedule_filter:
+        result["courses"] = [
+            c for c in result["courses"]
+            if any(sf in (c.get("schedule") or "") for sf in schedule_filter)
+        ]
+
+    # Apply semester filter client-side
+    if semester_filter:
+        result["courses"] = [
+            c for c in result["courses"]
+            if any(sf in (c.get("semester") or "") for sf in semester_filter)
+        ]
+
+    result["parsed_params"] = parsed
+    result["schedule_filter"] = schedule_filter
+    result["semester_filter"] = semester_filter
+
+    return _ok(result)
