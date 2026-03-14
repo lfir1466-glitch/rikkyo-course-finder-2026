@@ -690,3 +690,85 @@ def safe_search_with_evaluations(page=1, exam_filter="all", exam_max=100, report
         return _err("network_error", str(e))
     except Exception as e:
         return _err("parse_error", str(e))
+
+
+def search_and_detail(top_n=5, include_detail=True, **kwargs):
+    """Search courses and optionally fetch full syllabus details for top N results.
+
+    Accepts human-readable params via resolve_params().
+    Returns structured response with courses enriched with full syllabus data.
+    """
+    try:
+        params = resolve_params(**kwargs)
+        nendo = params.get("nendo", "2025")
+        result = search_courses(page=1, **params)
+
+        if result["total"] == 0:
+            return _ok({"total": 0, "courses": [], "note": "no_results"})
+
+        courses = result["courses"][:top_n]
+
+        if include_detail:
+            for course in courses:
+                code = course.get("code")
+                if code:
+                    try:
+                        detail = get_syllabus_detail(nendo=nendo, kodo_2=code)
+                        course["syllabus"] = detail
+                    except Exception:
+                        course["syllabus"] = None
+
+        return _ok({
+            "total": result["total"],
+            "max_page": result["max_page"],
+            "showing": len(courses),
+            "courses": courses,
+        })
+    except requests.exceptions.RequestException as e:
+        return _err("network_error", str(e))
+    except Exception as e:
+        return _err("parse_error", str(e))
+
+
+def search_and_detail_parallel(top_n=5, **kwargs):
+    """Like search_and_detail but fetches details in parallel for speed."""
+    try:
+        params = resolve_params(**kwargs)
+        nendo = params.get("nendo", "2025")
+        result = search_courses(page=1, **params)
+
+        if result["total"] == 0:
+            return _ok({"total": 0, "courses": [], "note": "no_results"})
+
+        courses = result["courses"][:top_n]
+        codes = [c["code"] for c in courses if c.get("code")]
+
+        details = {}
+        worker_count = min(6, len(codes))
+        with ThreadPoolExecutor(max_workers=worker_count) as executor:
+            futures = {}
+            for code in codes:
+                future = executor.submit(get_syllabus_detail, nendo=nendo, kodo_2=code)
+                futures[future] = code
+            for future in as_completed(futures):
+                code = futures[future]
+                try:
+                    details[code] = future.result()
+                except Exception:
+                    details[code] = None
+
+        for course in courses:
+            code = course.get("code")
+            if code and code in details:
+                course["syllabus"] = details[code]
+
+        return _ok({
+            "total": result["total"],
+            "max_page": result["max_page"],
+            "showing": len(courses),
+            "courses": courses,
+        })
+    except requests.exceptions.RequestException as e:
+        return _err("network_error", str(e))
+    except Exception as e:
+        return _err("parse_error", str(e))
