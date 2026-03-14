@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rikkyo-syllabus"
+version = "0.1.0"
+description = "Course search tool for Rikkyo University — better search UI, CLI, and MCP server for the official syllabus system"
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+authors = [
+    {name = "Niku Yaki"},
+]
+keywords = ["rikkyo", "syllabus", "course-search", "university"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Topic :: Education",
+]
+
+dependencies = [
+    "requests>=2.28",
+    "beautifulsoup4>=4.12",
+]
+
+[project.optional-dependencies]
+web = ["flask>=3.0"]
+mcp = ["mcp[cli]>=1.0"]
+all = ["flask>=3.0", "mcp[cli]>=1.0"]
+
+[project.scripts]
+rikkyo-syllabus = "cli:main"
+
+[project.urls]
+Homepage = "https://github.com/nikuyaki/rikkyo-syllabus"
+Issues = "https://github.com/nikuyaki/rikkyo-syllabus/issues"
