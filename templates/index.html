@@ -1,0 +1,1324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>立教大学 選課助手</title>
+<style>
+  :root {
+    --purple: #582c83;
+    --purple-light: #7b4faa;
+    --purple-bg: #f5f0fa;
+    --gray-bg: #f8f9fa;
+    --border: #e0e0e0;
+    --text: #333;
+    --text-light: #666;
+    --white: #fff;
+    --shadow: 0 2px 8px rgba(0,0,0,0.08);
+    --radius: 8px;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: var(--gray-bg);
+    color: var(--text);
+    line-height: 1.6;
+  }
+
+  .header {
+    background: var(--purple);
+    color: var(--white);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  }
+  .header h1 { font-size: 20px; font-weight: 600; }
+  .header .subtitle { font-size: 13px; opacity: 0.8; }
+
+  .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+
+  .search-panel {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 24px;
+    margin-bottom: 20px;
+  }
+  .search-panel h2 {
+    font-size: 16px;
+    color: var(--purple);
+    margin-bottom: 16px;
+    padding-bottom: 8px;
+    border-bottom: 2px solid var(--purple);
+  }
+
+  .search-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px 24px;
+  }
+  @media (max-width: 768px) {
+    .search-grid { grid-template-columns: 1fr; }
+  }
+
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-light);
+  }
+  .field input, .field select {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+  }
+  .field input:focus, .field select:focus {
+    outline: none;
+    border-color: var(--purple);
+    box-shadow: 0 0 0 2px rgba(88,44,131,0.1);
+  }
+
+  .field-wide { grid-column: 1 / -1; }
+
+  .search-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 16px;
+    justify-content: center;
+  }
+  .btn {
+    padding: 10px 32px;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-primary {
+    background: var(--purple);
+    color: var(--white);
+  }
+  .btn-primary:hover { background: var(--purple-light); }
+  .btn-secondary {
+    background: var(--white);
+    color: var(--text-light);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { background: var(--gray-bg); }
+
+  .time-filter {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .time-filter summary {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--purple);
+    cursor: pointer;
+    user-select: none;
+  }
+  .time-grid {
+    display: grid;
+    grid-template-columns: auto repeat(6, 1fr);
+    gap: 2px;
+    margin-top: 12px;
+    max-width: 500px;
+  }
+  .time-grid .cell {
+    text-align: center;
+    padding: 6px 4px;
+    font-size: 13px;
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s;
+  }
+  .time-grid .header-cell {
+    font-weight: 700;
+    color: var(--purple);
+    background: var(--purple-bg);
+  }
+  .time-grid .period-cell {
+    font-weight: 600;
+    color: var(--text-light);
+    background: var(--gray-bg);
+    cursor: default;
+  }
+  .time-grid .slot {
+    background: #f0f0f0;
+    border: 2px solid transparent;
+  }
+  .time-grid .slot:hover { background: #e0d8ec; }
+  .time-grid .slot.selected {
+    background: var(--purple);
+    color: var(--white);
+    font-weight: 600;
+  }
+
+  .semester-checks {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 8px;
+  }
+  .semester-checks label {
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+  }
+
+  .results-panel {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .results-header {
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+  }
+  .results-header h2 {
+    font-size: 16px;
+    color: var(--purple);
+  }
+  .results-count {
+    font-size: 13px;
+    color: var(--text-light);
+    background: var(--purple-bg);
+    padding: 4px 12px;
+    border-radius: 12px;
+  }
+
+  .results-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  .results-table th {
+    background: var(--purple);
+    color: var(--white);
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+  }
+  .results-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .results-table tr:hover td {
+    background: var(--purple-bg);
+  }
+  .results-table .course-name {
+    color: var(--purple);
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+  }
+  .results-table .course-name:hover {
+    text-decoration: underline;
+  }
+  .results-table .tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .tag-spring { background: #e8f5e9; color: #2e7d32; }
+  .tag-fall { background: #fff3e0; color: #e65100; }
+  .tag-full { background: #e3f2fd; color: #1565c0; }
+  .tag-other { background: #f3e5f5; color: #7b1fa2; }
+  .tag-ikebukuro { background: #fce4ec; color: #c62828; }
+  .tag-niiza { background: #e0f2f1; color: #00695c; }
+
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    padding: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .pagination button {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    background: var(--white);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+  }
+  .pagination button:hover { border-color: var(--purple); color: var(--purple); }
+  .pagination button.active {
+    background: var(--purple);
+    color: var(--white);
+    border-color: var(--purple);
+  }
+  .pagination button:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-light);
+  }
+  .loading .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--purple);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .empty { text-align: center; padding: 60px 20px; color: var(--text-light); }
+
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.5);
+    z-index: 100;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 40px 20px;
+    overflow-y: auto;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--white);
+    border-radius: var(--radius);
+    box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+    max-width: 960px;
+    width: 100%;
+    max-height: 85vh;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+  .modal::-webkit-scrollbar { display: none; }
+  .modal-header {
+    padding: 20px 24px;
+    background: var(--purple);
+    color: var(--white);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: var(--radius) var(--radius) 0 0;
+    position: sticky;
+    top: 0;
+    z-index: 1;
+  }
+  .modal-header h3 { font-size: 16px; }
+  .modal-close {
+    background: none;
+    border: none;
+    color: var(--white);
+    font-size: 24px;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+  }
+  .modal-body { padding: 24px; }
+  .modal-body .detail-row {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    gap: 8px;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+    font-size: 14px;
+  }
+  .modal-body .detail-label {
+    font-weight: 600;
+    color: var(--purple);
+  }
+  .modal-body .detail-value {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .detail-loading {
+    text-align: center;
+    padding: 40px;
+    color: var(--text-light);
+  }
+  .detail-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 4px 0;
+    font-size: 13px;
+  }
+  .detail-table th {
+    background: var(--purple-bg);
+    color: var(--purple);
+    padding: 8px 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid var(--purple);
+  }
+  .detail-table td {
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .detail-table tr:last-child td {
+    border-bottom: none;
+  }
+  .detail-note {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--text-light);
+    white-space: pre-wrap;
+  }
+
+  .eval-tag {
+    display: inline-block;
+    margin-top: 4px;
+    padding: 1px 7px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .eval-tag.eval-green { background: #e8f5e9; color: #2e7d32; }
+  .eval-tag.eval-orange { background: #fff3e0; color: #e65100; }
+  .eval-tag.eval-red { background: #fce4ec; color: #c62828; }
+  .eval-tag.eval-blue { background: #e3f2fd; color: #1565c0; }
+
+  .eval-filter {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border);
+  }
+  .eval-filter summary {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--purple);
+    cursor: pointer;
+    user-select: none;
+  }
+  .eval-filter-body {
+    margin-top: 12px;
+  }
+  .eval-filter-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .eval-chip {
+    padding: 5px 14px;
+    border: 2px solid var(--border);
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    background: var(--white);
+    color: var(--text);
+    transition: all 0.15s;
+    user-select: none;
+  }
+  .eval-chip:hover { border-color: var(--purple-light); color: var(--purple); }
+  .eval-chip.active {
+    background: var(--purple);
+    color: var(--white);
+    border-color: var(--purple);
+  }
+  .eval-controls-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: var(--text-light);
+  }
+  .eval-controls-row select {
+    padding: 6px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 13px;
+    background: var(--white);
+  }
+  .eval-controls-row select:focus {
+    outline: none;
+    border-color: var(--purple);
+    box-shadow: 0 0 0 2px rgba(88,44,131,0.1);
+  }
+  .eval-progress {
+    margin-top: 12px;
+    padding: 12px;
+    background: var(--purple-bg);
+    border-radius: 8px;
+  }
+  .eval-progress-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    color: var(--text-light);
+  }
+  .eval-progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(88,44,131,0.15);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .eval-progress-fill {
+    height: 100%;
+    width: 0%;
+    background: linear-gradient(90deg, var(--purple), var(--purple-light));
+    transition: width 0.2s ease;
+  }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>立教大学 選課助手</h1>
+    <div class="subtitle">Rikkyo Course Finder - Better Search for Syllabus</div>
+  </div>
+</div>
+
+<div class="container">
+  <div class="search-panel">
+    <h2>検索条件</h2>
+    <div class="search-grid">
+      <div class="field">
+        <label>年度</label>
+        <select id="nendo">
+          <option value="2025" selected>2025</option>
+          <option value="2024">2024</option>
+          <option value="2023">2023</option>
+          <option value="2022">2022</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>科目設置学部</label>
+        <select id="gakubu">
+          {% for key, name in gakubu_map.items() %}
+          <option value="{{ key }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>科目名</label>
+        <input type="text" id="kamokumei" placeholder="例: 英語、データサイエンス...">
+      </div>
+      <div class="field">
+        <label>教員名</label>
+        <input type="text" id="admin36_text" placeholder="例: 田中">
+      </div>
+      <div class="field">
+        <label>科目設置区分</label>
+        <select id="bunrui19">
+          {% for val, name in bunrui19_map.items() %}
+          <option value="{{ val }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>授業形態</label>
+        <select id="bunrui3">
+          {% for val, name in bunrui3_map.items() %}
+          <option value="{{ val }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>校地</label>
+        <select id="bunrui12">
+          {% for val, name in bunrui12_map.items() %}
+          <option value="{{ val }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>履修登録方法</label>
+        <select id="bunrui2">
+          {% for val, name in bunrui2_map.items() %}
+          <option value="{{ val }}">{{ name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="field">
+        <label>キーワード 1</label>
+        <input type="text" id="keyword_1" placeholder="シラバス内キーワード">
+      </div>
+      <div class="field">
+        <label>キーワード 2</label>
+        <input type="text" id="keyword_2" placeholder="シラバス内キーワード">
+      </div>
+      <div class="field">
+        <label>科目コード</label>
+        <input type="text" id="kodo_2" placeholder="例: AF182">
+      </div>
+      <div class="field">
+        <label>科目ナンバリング</label>
+        <input type="text" id="kodo_1" placeholder="例: EDU3700">
+      </div>
+    </div>
+
+    <details class="time-filter">
+      <summary>曜日時限フィルタ（結果をローカルで絞り込み）</summary>
+      <p style="font-size:12px;color:var(--text-light);margin-top:8px;">
+        クリックして希望の時間帯を選択。選択がなければ全件表示。
+      </p>
+      <div class="semester-checks" id="semesterChecks">
+        <label><input type="checkbox" value="春学期" checked> 春学期</label>
+        <label><input type="checkbox" value="秋学期" checked> 秋学期</label>
+        <label><input type="checkbox" value="通年" checked> 通年</label>
+      </div>
+      <div class="time-grid" id="timeGrid"></div>
+    </details>
+
+    <details class="eval-filter" id="evalFilterSection">
+      <summary>評価方式フィルタ</summary>
+      <div class="eval-filter-body">
+        <div class="eval-filter-chips">
+          <span class="eval-chip active" data-eval="all" onclick="setEvalFilter('all')">全て</span>
+          <span class="eval-chip" data-eval="no-exam" onclick="setEvalFilter('no-exam')">試験なし（100%平常点）</span>
+          <span class="eval-chip" data-eval="has-report" onclick="setEvalFilter('has-report')">含 Report</span>
+          <span class="eval-chip" data-eval="has-exam" onclick="setEvalFilter('has-exam')">試験あり</span>
+        </div>
+        <div class="eval-controls-row">
+          <label>試験の割合上限：</label>
+          <select id="evalExamMax" onchange="applyEvalSlider()">
+            <option value="100">制限なし</option>
+            <option value="80">80%以下</option>
+            <option value="60">60%以下</option>
+            <option value="40">40%以下</option>
+            <option value="20">20%以下</option>
+            <option value="0">0%（試験なし）</option>
+          </select>
+          <label>Report 下限：</label>
+          <select id="evalReportMin" onchange="applyReportFilter()">
+            <option value="0">制限なし</option>
+            <option value="20">20%以上</option>
+            <option value="40">40%以上</option>
+            <option value="60">60%以上</option>
+            <option value="80">80%以上</option>
+            <option value="100">100%</option>
+          </select>
+          <label>結果排序：</label>
+          <select id="evalSortMode" onchange="applyEvalSort()">
+            <option value="discover">发现顺序</option>
+            <option value="exam-desc">试验比例高到低</option>
+            <option value="report-desc">Report 比例高到低</option>
+            <option value="code-asc">课程代码顺序</option>
+          </select>
+        </div>
+        <div class="eval-progress" id="evalProgress" style="display:none;">
+          <div class="eval-progress-meta">
+            <span id="evalProgressText">評価検索を準備中...</span>
+            <span id="evalProgressCount"></span>
+          </div>
+          <div class="eval-progress-bar">
+            <div class="eval-progress-fill" id="evalProgressFill"></div>
+          </div>
+        </div>
+      </div>
+    </details>
+
+    <div class="search-actions">
+      <button class="btn btn-primary" onclick="doSearch(1)">検索</button>
+      <button class="btn btn-secondary" onclick="clearForm()">クリア</button>
+    </div>
+  </div>
+
+  <div class="results-panel" id="resultsPanel" style="display:none;">
+    <div class="results-header">
+      <h2>検索結果</h2>
+      <span class="results-count" id="resultsCount"></span>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="results-table">
+        <thead>
+          <tr>
+            <th>科目コード</th>
+            <th>ナンバリング</th>
+            <th>科目名</th>
+            <th>登録方法</th>
+            <th>担当者</th>
+            <th>学期</th>
+            <th>曜日時限</th>
+            <th>校地</th>
+            <th>注意事項</th>
+          </tr>
+        </thead>
+        <tbody id="resultsBody"></tbody>
+      </table>
+    </div>
+    <div class="pagination" id="pagination"></div>
+  </div>
+
+  <div class="loading" id="loadingIndicator" style="display:none;">
+    <div class="spinner"></div>
+    <div>検索中...</div>
+  </div>
+
+  <div class="empty" id="emptyState" style="display:none;">
+    条件を入力して検索してください
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="modalTitle">シラバス詳細</h3>
+      <button class="modal-close" onclick="closeModal()">&times;</button>
+    </div>
+    <div class="modal-body" id="modalBody">
+      <div class="detail-loading">読み込み中...</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const DAYS = ["月", "火", "水", "木", "金", "土"];
+const PERIODS = ["1", "2", "3", "4", "5", "6"];
+const PAGE_SIZE = 20;
+const ASYNC_PAGE_CONCURRENCY = 3;
+
+let selectedSlots = new Set();
+let currentPage = 1;
+let lastResults = null;
+let evalFilterMode = "all";
+let activeSearchRun = null;
+let currentSearchToken = 0;
+
+function initTimeGrid() {
+  const grid = document.getElementById("timeGrid");
+  grid.innerHTML = "";
+
+  const empty = document.createElement("div");
+  empty.className = "cell period-cell";
+  empty.textContent = "";
+  grid.appendChild(empty);
+
+  DAYS.forEach(day => {
+    const cell = document.createElement("div");
+    cell.className = "cell header-cell";
+    cell.textContent = day;
+    grid.appendChild(cell);
+  });
+
+  PERIODS.forEach(period => {
+    const pCell = document.createElement("div");
+    pCell.className = "cell period-cell";
+    pCell.textContent = period;
+    grid.appendChild(pCell);
+
+    DAYS.forEach(day => {
+      const cell = document.createElement("div");
+      cell.className = "cell slot";
+      cell.dataset.key = day + period;
+      cell.textContent = "\u00A0";
+      cell.onclick = () => toggleSlot(cell);
+      grid.appendChild(cell);
+    });
+  });
+}
+
+function toggleSlot(cell) {
+  const key = cell.dataset.key;
+  if (selectedSlots.has(key)) {
+    selectedSlots.delete(key);
+    cell.classList.remove("selected");
+    cell.textContent = "\u00A0";
+  } else {
+    selectedSlots.add(key);
+    cell.classList.add("selected");
+    cell.textContent = "\u2713";
+  }
+  if (lastResults) filterAndRender();
+}
+
+function semesterTag(s) {
+  if (s.includes("春")) return `<span class="tag tag-spring">${s}</span>`;
+  if (s.includes("秋")) return `<span class="tag tag-fall">${s}</span>`;
+  if (s.includes("通年")) return `<span class="tag tag-full">${s}</span>`;
+  return `<span class="tag tag-other">${s}</span>`;
+}
+
+function campusTag(c) {
+  if (c === "池袋") return `<span class="tag tag-ikebukuro">${c}</span>`;
+  if (c === "新座") return `<span class="tag tag-niiza">${c}</span>`;
+  return c;
+}
+
+function setLoadingState(visible, text = "検索中...") {
+  const loading = document.getElementById("loadingIndicator");
+  loading.style.display = visible ? "block" : "none";
+  loading.querySelector("div:last-child").textContent = text;
+}
+
+function showEmptyState(text) {
+  document.getElementById("resultsPanel").style.display = "none";
+  document.getElementById("emptyState").style.display = "block";
+  document.getElementById("emptyState").textContent = text;
+}
+
+function hideEvalProgress() {
+  document.getElementById("evalProgress").style.display = "none";
+  document.getElementById("evalProgressFill").style.width = "0%";
+  document.getElementById("evalProgressText").textContent = "評価検索を準備中...";
+  document.getElementById("evalProgressCount").textContent = "";
+}
+
+function updateEvalProgress(run) {
+  const progress = document.getElementById("evalProgress");
+  progress.style.display = "block";
+
+  const totalPages = Math.max(run.maxPage || 1, 1);
+  const percent = Math.round((run.pagesCompleted / totalPages) * 100);
+  document.getElementById("evalProgressFill").style.width = `${percent}%`;
+  document.getElementById("evalProgressText").textContent = run.completed
+    ? "評価条件の検索が完了しました"
+    : "評価情報を並列で取得中...";
+  document.getElementById("evalProgressCount").textContent = `${run.pagesCompleted}/${totalPages} ページ · ${run.aggregatedCourses.length}件ヒット`;
+}
+
+function getBaseSearchParams() {
+  const fields = [
+    "nendo", "gakubu", "kamokumei", "bunrui19", "admin36_text",
+    "bunrui3", "bunrui12", "bunrui2", "keyword_1", "keyword_2", "kodo_2", "kodo_1"
+  ];
+  const params = new URLSearchParams();
+  fields.forEach(field => {
+    const el = document.getElementById(field);
+    if (el && el.value) params.set(field, el.value);
+  });
+  return params;
+}
+
+function getEvaluationParams() {
+  const params = getBaseSearchParams();
+  params.set("exam_filter", evalFilterMode);
+  params.set("exam_max", document.getElementById("evalExamMax").value);
+  params.set("report_min", document.getElementById("evalReportMin").value);
+  return params;
+}
+
+function needsAsyncEvaluationSearch() {
+  return evalFilterMode !== "all"
+    || parseInt(document.getElementById("evalExamMax").value, 10) < 100
+    || parseInt(document.getElementById("evalReportMin").value, 10) > 0;
+}
+
+function cancelActiveSearch() {
+  if (!activeSearchRun) return;
+  activeSearchRun.cancelled = true;
+  activeSearchRun.controllers.forEach(controller => controller.abort());
+  activeSearchRun = null;
+}
+
+function buildDisplayData() {
+  if (lastResults && lastResults.mode === "async" && activeSearchRun) {
+    return {
+      mode: "async",
+      base_total: activeSearchRun.baseTotal,
+      courses: activeSearchRun.aggregatedCourses.slice(),
+      progress: {
+        completed: activeSearchRun.completed,
+        pagesCompleted: activeSearchRun.pagesCompleted,
+        maxPage: activeSearchRun.maxPage,
+      },
+    };
+  }
+  return lastResults;
+}
+
+async function doSearch(page) {
+  currentPage = page;
+  currentSearchToken += 1;
+  const token = currentSearchToken;
+
+  cancelActiveSearch();
+  document.getElementById("emptyState").style.display = "none";
+
+  if (needsAsyncEvaluationSearch()) {
+    await startAsyncEvaluationSearch(token);
+    return;
+  }
+
+  hideEvalProgress();
+  setLoadingState(true, "検索中...");
+
+  try {
+    const params = getBaseSearchParams();
+    params.set("page", page);
+
+    const resp = await fetch("/api/search?" + params.toString());
+    const data = await resp.json();
+    if (token !== currentSearchToken) return;
+    if (data.error) throw new Error(data.error);
+
+    lastResults = { ...data, mode: "normal" };
+    filterAndRender();
+  } catch (e) {
+    if (token !== currentSearchToken) return;
+    showEmptyState("検索に失敗しました");
+    alert("通信エラー: " + e.message);
+  } finally {
+    if (token === currentSearchToken) setLoadingState(false);
+  }
+}
+
+async function startAsyncEvaluationSearch(token) {
+  hideEvalProgress();
+  setLoadingState(true, "評価条件を準備中...");
+  document.getElementById("resultsPanel").style.display = "none";
+
+  try {
+    const baseParams = getBaseSearchParams();
+    const baseResp = await fetch("/api/search?" + new URLSearchParams({ ...Object.fromEntries(baseParams), page: 1 }).toString());
+    const baseData = await baseResp.json();
+
+    if (token !== currentSearchToken) return;
+    if (baseData.error) throw new Error(baseData.error);
+
+    activeSearchRun = {
+      id: token,
+      controllers: [],
+      aggregatedCourses: [],
+      pagesCompleted: 0,
+      maxPage: baseData.max_page,
+      baseTotal: baseData.total,
+      completed: false,
+      cancelled: false,
+      discoveryCounter: 0,
+      seenKeys: new Set(),
+    };
+    lastResults = { mode: "async" };
+
+    updateEvalProgress(activeSearchRun);
+    filterAndRender();
+    setLoadingState(false);
+    runAsyncEvaluationQueue(activeSearchRun);
+  } catch (e) {
+    if (token !== currentSearchToken) return;
+    setLoadingState(false);
+    hideEvalProgress();
+    showEmptyState("検索に失敗しました");
+    alert("通信エラー: " + e.message);
+  }
+}
+
+function runAsyncEvaluationQueue(run) {
+  let nextPage = 1;
+  let inFlight = 0;
+
+  const launchNext = () => {
+    if (!activeSearchRun || activeSearchRun.id !== run.id || run.cancelled) return;
+
+    while (inFlight < ASYNC_PAGE_CONCURRENCY && nextPage <= run.maxPage) {
+      const page = nextPage;
+      nextPage += 1;
+      inFlight += 1;
+      fetchAsyncEvaluationPage(run, page).finally(() => {
+        inFlight -= 1;
+        if (!activeSearchRun || activeSearchRun.id !== run.id || run.cancelled) return;
+
+        if (nextPage > run.maxPage && inFlight === 0) {
+          run.completed = true;
+          updateEvalProgress(run);
+          filterAndRender();
+          return;
+        }
+        launchNext();
+      });
+    }
+  };
+
+  launchNext();
+}
+
+async function fetchAsyncEvaluationPage(run, page) {
+  const controller = new AbortController();
+  run.controllers.push(controller);
+
+  try {
+    const params = getEvaluationParams();
+    params.set("page", page);
+    const resp = await fetch("/api/search/evaluation-page?" + params.toString(), { signal: controller.signal });
+    const data = await resp.json();
+
+    if (!activeSearchRun || activeSearchRun.id !== run.id || run.cancelled) return;
+    if (data.error) throw new Error(data.error);
+
+    data.courses.forEach((course, index) => {
+      const key = `${page}:${course.code || index}`;
+      if (run.seenKeys.has(key)) return;
+      run.seenKeys.add(key);
+      course.source_order = (page - 1) * PAGE_SIZE + (course.source_order ?? index);
+      course.discovered_order = run.discoveryCounter++;
+      run.aggregatedCourses.push(course);
+    });
+  } catch (e) {
+    if (e.name !== "AbortError" && activeSearchRun && activeSearchRun.id === run.id) {
+      console.error(e);
+    }
+  } finally {
+    if (!activeSearchRun || activeSearchRun.id !== run.id || run.cancelled) return;
+    run.pagesCompleted += 1;
+    updateEvalProgress(run);
+    filterAndRender();
+  }
+}
+
+function setEvalFilter(mode) {
+  evalFilterMode = mode;
+  document.querySelectorAll(".eval-chip").forEach(chip => {
+    chip.classList.toggle("active", chip.dataset.eval === mode);
+  });
+  if (lastResults) doSearch(1);
+}
+
+function applyEvalSlider() {
+  if (lastResults) doSearch(1);
+}
+
+function applyReportFilter() {
+  if (lastResults) doSearch(1);
+}
+
+function applyEvalSort() {
+  if (buildDisplayData()?.mode === "async") {
+    currentPage = 1;
+    filterAndRender();
+  }
+}
+
+function sortAsyncCourses(courses) {
+  const mode = document.getElementById("evalSortMode").value;
+  const sorted = [...courses];
+
+  sorted.sort((a, b) => {
+    if (mode === "exam-desc") {
+      return (b.evaluation?.exam_pct || 0) - (a.evaluation?.exam_pct || 0)
+        || (a.source_order || 0) - (b.source_order || 0);
+    }
+    if (mode === "report-desc") {
+      return (b.evaluation?.report_pct || 0) - (a.evaluation?.report_pct || 0)
+        || (a.source_order || 0) - (b.source_order || 0);
+    }
+    if (mode === "code-asc") {
+      return (a.code || "").localeCompare(b.code || "", "ja")
+        || (a.source_order || 0) - (b.source_order || 0);
+    }
+    return (a.discovered_order || 0) - (b.discovered_order || 0);
+  });
+
+  return sorted;
+}
+
+function applyLocalFilters(courses) {
+  let filtered = courses.slice();
+  const checks = document.querySelectorAll("#semesterChecks input:checked");
+  const allowedSemesters = new Set([...checks].map(c => c.value));
+
+  if (selectedSlots.size > 0) {
+    filtered = filtered.filter(course => {
+      const schedule = course.schedule || "";
+      for (const slot of selectedSlots) {
+        if (schedule.includes(slot)) return true;
+      }
+      return false;
+    });
+  }
+
+  if (allowedSemesters.size < 3) {
+    filtered = filtered.filter(course => {
+      for (const semester of allowedSemesters) {
+        if ((course.semester || "").includes(semester)) return true;
+      }
+      return false;
+    });
+  }
+
+  return filtered;
+}
+
+function evalTagHtml(course) {
+  const info = course.evaluation;
+  if (!info) return "";
+
+  const exam = info.exam_pct || 0;
+  const written = info.written_exam_pct || 0;
+  const report = info.report_pct || 0;
+  const inClass = info.in_class_pct || 0;
+
+  if (report === 100) {
+    return '<div class="eval-tag eval-blue">Report 100%</div>';
+  }
+  if (written > 0 && report > 0) {
+    return `<div class="eval-tag eval-orange">試験${written}% / Report${report}%</div>`;
+  }
+  if (written > 0) {
+    return written >= 70
+      ? `<div class="eval-tag eval-red">試験${written}%</div>`
+      : `<div class="eval-tag eval-orange">試験${written}%</div>`;
+  }
+  if (report > 0) {
+    return `<div class="eval-tag eval-blue">Report ${report}%</div>`;
+  }
+  if (exam === 0 && inClass >= 100) {
+    return '<div class="eval-tag eval-green">平常点100%</div>';
+  }
+  if (exam === 0) {
+    return '<div class="eval-tag eval-green">試験なし</div>';
+  }
+  return `<div class="eval-tag eval-orange">評価${exam}%</div>`;
+}
+
+function filterAndRender() {
+  const data = buildDisplayData();
+  if (!data) return;
+
+  const rawCourses = data.courses || [];
+  let filteredCourses = applyLocalFilters(rawCourses);
+  if (data.mode === "async") {
+    filteredCourses = sortAsyncCourses(filteredCourses);
+  }
+
+  renderResults(data, filteredCourses, rawCourses.length);
+}
+
+function renderRows(courses) {
+  return courses.map(course => {
+    const safeName = (course.name || "").replace(/'/g, "\\'");
+    const nameHtml = course.code
+      ? `<a class="course-name" onclick="event.preventDefault(); event.stopPropagation(); showDetail('${course.code}', '${safeName}');" href="javascript:void(0)">${course.name}</a>`
+      : course.name;
+    const evalBadge = evalTagHtml(course);
+
+    return `
+      <tr>
+        <td>${course.code || ""}</td>
+        <td>${course.numbering || ""}</td>
+        <td>${nameHtml}${evalBadge ? '<br>' + evalBadge : ''}</td>
+        <td>${course.reg_method || ""}</td>
+        <td>${course.teacher || ""}</td>
+        <td>${semesterTag(course.semester || "")}</td>
+        <td><strong>${course.schedule || ""}</strong></td>
+        <td>${campusTag(course.campus || "")}</td>
+        <td style="font-size:11px;color:var(--text-light)">${course.notes || ""}</td>
+      </tr>`;
+  }).join("");
+}
+
+function renderResults(data, courses, rawCount) {
+  const panel = document.getElementById("resultsPanel");
+  const body = document.getElementById("resultsBody");
+  const count = document.getElementById("resultsCount");
+
+  if (data.mode === "async") {
+    const progress = data.progress;
+    if (progress.completed && rawCount === 0) {
+      showEmptyState("検索結果がありません");
+      return;
+    }
+
+    const totalPages = rawCount > 0 ? Math.ceil(courses.length / PAGE_SIZE) || 1 : 1;
+    if (progress.completed && courses.length > 0 && currentPage > totalPages) {
+      currentPage = totalPages;
+    }
+
+    const pageStart = (currentPage - 1) * PAGE_SIZE;
+    const pageCourses = courses.slice(pageStart, pageStart + PAGE_SIZE);
+    const localFilteredText = rawCount !== courses.length ? ` / 当前显示${courses.length}件` : "";
+    const statusText = progress.completed
+      ? `評価条件で${rawCount}件 / 元検索${data.base_total}件`
+      : `已扫描${progress.pagesCompleted}/${progress.maxPage}页，已找到${rawCount}件 / 元検索${data.base_total}件`;
+
+    document.getElementById("emptyState").style.display = "none";
+    panel.style.display = "block";
+    count.textContent = `${statusText}${localFilteredText} / ページ${currentPage}`;
+
+    if (pageCourses.length === 0) {
+      body.innerHTML = `<tr><td colspan="9" style="text-align:center;padding:40px;color:var(--text-light);">
+        ${progress.completed ? "这一页没有结果。" : "这一页的结果还在检索中，请稍候..."}
+      </td></tr>`;
+      renderPagination(data, courses.length);
+      return;
+    }
+
+    body.innerHTML = renderRows(pageCourses);
+    renderPagination(data, courses.length);
+    return;
+  }
+
+  if (courses.length === 0 && data.total === 0) {
+    showEmptyState("検索結果がありません");
+    return;
+  }
+
+  document.getElementById("emptyState").style.display = "none";
+  panel.style.display = "block";
+  const localFiltersActive = selectedSlots.size > 0 || document.querySelectorAll("#semesterChecks input:checked").length < 3;
+  const localFilteredText = localFiltersActive ? ` / 表示${courses.length}件` : "";
+  count.textContent = `全${data.total}件 / ページ${currentPage}${localFilteredText}`;
+  body.innerHTML = renderRows(courses);
+  renderPagination(data, courses.length);
+}
+
+function renderPagination(data, filteredCount) {
+  const container = document.getElementById("pagination");
+
+  if (data.mode === "async") {
+    const hasPrev = currentPage > 1;
+    const hasNext = filteredCount > currentPage * PAGE_SIZE || !data.progress.completed;
+    container.innerHTML = `
+      <button ${hasPrev ? "" : "disabled"} onclick="changeAsyncPage(${currentPage - 1})">前へ</button>
+      <button class="active" disabled>${currentPage}</button>
+      <button ${hasNext ? "" : "disabled"} onclick="changeAsyncPage(${currentPage + 1})">次へ</button>
+    `;
+    return;
+  }
+
+  const maxPage = data.max_page || 1;
+  if (maxPage <= 1) {
+    container.innerHTML = "";
+    return;
+  }
+
+  let html = "";
+  html += `<button ${currentPage <= 1 ? "disabled" : ""} onclick="doSearch(${currentPage - 1})">前へ</button>`;
+
+  const start = Math.max(1, currentPage - 4);
+  const end = Math.min(maxPage, currentPage + 5);
+
+  if (start > 1) html += `<button onclick="doSearch(1)">1</button>`;
+  if (start > 2) html += `<button disabled>...</button>`;
+
+  for (let i = start; i <= end; i++) {
+    html += `<button class="${i === currentPage ? "active" : ""}" onclick="doSearch(${i})">${i}</button>`;
+  }
+
+  if (end < maxPage - 1) html += `<button disabled>...</button>`;
+  if (end < maxPage) html += `<button onclick="doSearch(${maxPage})">${maxPage}</button>`;
+
+  html += `<button ${currentPage >= maxPage ? "disabled" : ""} onclick="doSearch(${currentPage + 1})">次へ</button>`;
+  container.innerHTML = html;
+}
+
+function changeAsyncPage(page) {
+  if (page < 1) return;
+  currentPage = page;
+  filterAndRender();
+}
+
+async function showDetail(code, name) {
+  const nendo = document.getElementById("nendo").value;
+  const overlay = document.getElementById("modalOverlay");
+  const body = document.getElementById("modalBody");
+  const title = document.getElementById("modalTitle");
+
+  title.textContent = name;
+  body.innerHTML = '<div class="detail-loading"><div class="spinner" style="width:30px;height:30px;border:3px solid var(--border);border-top-color:var(--purple);border-radius:50%;animation:spin 0.8s linear infinite;margin:0 auto 12px;"></div>読み込み中...</div>';
+  overlay.classList.add("active");
+
+  try {
+    const params = new URLSearchParams({ nendo, kodo_2: code });
+    const resp = await fetch("/api/detail?" + params.toString());
+    const data = await resp.json();
+    if (data.error) {
+      body.innerHTML = `<p style="color:red">エラー: ${data.error}</p>`;
+      return;
+    }
+
+    body.innerHTML = Object.entries(data).map(([key, value]) => {
+      let valueHtml;
+      if (typeof value === "object" && value !== null && value.type === "table") {
+        let table = '<table class="detail-table">';
+        if (value.headers && value.headers.length) {
+          table += '<thead><tr>' + value.headers.map(header => `<th>${header}</th>`).join("") + '</tr></thead>';
+        }
+        table += '<tbody>' + (value.rows || []).map(row =>
+          '<tr>' + row.map(cell => `<td>${cell}</td>`).join("") + '</tr>'
+        ).join("") + '</tbody></table>';
+        if (value.note) {
+          table += `<div class="detail-note">${value.note}</div>`;
+        }
+        valueHtml = table;
+      } else {
+        valueHtml = value;
+      }
+      return `<div class="detail-row"><div class="detail-label">${key}</div><div class="detail-value">${valueHtml}</div></div>`;
+    }).join("");
+  } catch (e) {
+    body.innerHTML = `<p style="color:red">通信エラー: ${e.message}</p>`;
+  }
+}
+
+function closeModal() {
+  document.getElementById("modalOverlay").classList.remove("active");
+}
+
+document.getElementById("modalOverlay").addEventListener("click", event => {
+  if (event.target === event.currentTarget) closeModal();
+});
+
+function clearForm() {
+  currentSearchToken += 1;
+  cancelActiveSearch();
+
+  document.querySelectorAll(".search-grid input").forEach(el => { el.value = ""; });
+  document.querySelectorAll(".search-grid select").forEach(el => { el.selectedIndex = 0; });
+  selectedSlots.clear();
+  document.querySelectorAll(".time-grid .slot").forEach(cell => {
+    cell.classList.remove("selected");
+    cell.textContent = "\u00A0";
+  });
+  document.querySelectorAll("#semesterChecks input").forEach(cb => { cb.checked = true; });
+  lastResults = null;
+  evalFilterMode = "all";
+  document.getElementById("evalExamMax").selectedIndex = 0;
+  document.getElementById("evalReportMin").selectedIndex = 0;
+  document.getElementById("evalSortMode").selectedIndex = 0;
+  document.querySelectorAll(".eval-chip").forEach(chip => {
+    chip.classList.toggle("active", chip.dataset.eval === "all");
+  });
+  hideEvalProgress();
+  setLoadingState(false);
+  showEmptyState("条件を入力して検索してください");
+}
+
+document.querySelectorAll("#semesterChecks input").forEach(checkbox => {
+  checkbox.addEventListener("change", () => {
+    if (lastResults) filterAndRender();
+  });
+});
+
+document.addEventListener("keydown", event => {
+  if (event.key === "Enter" && !document.getElementById("modalOverlay").classList.contains("active")) {
+    doSearch(1);
+  }
+  if (event.key === "Escape") closeModal();
+});
+
+initTimeGrid();
+</script>
+</body>
+</html>
