@@ -140,7 +140,7 @@ def cmd_schema(_args):
                     "year": {
                         "description": "年度 (Academic year, default: 2025)",
                         "type": "string",
-                        "default": "2025",
+                        "default": "2026",
                     },
                     "course_code": {
                         "description": "科目コード (Course code, e.g. AF182)",
@@ -189,7 +189,7 @@ def cmd_schema(_args):
                     "year": {
                         "description": "年度 (Academic year)",
                         "type": "string",
-                        "default": "2025",
+                        "default": "2026",
                     },
                 },
             },
@@ -279,7 +279,7 @@ def main():
     sp_search.add_argument("--category", help="科目設置区分")
     sp_search.add_argument("--format", "-f", help="授業形態")
     sp_search.add_argument("--registration", help="履修登録方法")
-    sp_search.add_argument("--year", "-y", default="2025", help="年度")
+    sp_search.add_argument("--year", "-y", default="2026", help="年度")
     sp_search.add_argument("--course-code", help="科目コード")
     sp_search.add_argument("--numbering", help="科目ナンバリング")
     sp_search.add_argument("--keyword", "-k", action="append", help="キーワード (max 3)")
@@ -293,7 +293,7 @@ def main():
     # detail
     sp_detail = subparsers.add_parser("detail", help="Get syllabus detail")
     sp_detail.add_argument("--code", required=True, help="科目コード")
-    sp_detail.add_argument("--year", "-y", default="2025", help="年度")
+    sp_detail.add_argument("--year", "-y", default="2026", help="年度")
     sp_detail.set_defaults(func=cmd_detail)
 
     # search-detail
@@ -304,7 +304,7 @@ def main():
     sp_sd.add_argument("--campus", "-c", help="校地")
     sp_sd.add_argument("--category", help="科目設置区分")
     sp_sd.add_argument("--format", "-f", help="授業形態")
-    sp_sd.add_argument("--year", "-y", default="2025", help="年度")
+    sp_sd.add_argument("--year", "-y", default="2026", help="年度")
     sp_sd.add_argument("--keyword", "-k", action="append", help="キーワード")
     sp_sd.add_argument("--top", type=int, default=5, help="Number of results to get details for")
     sp_sd.set_defaults(func=cmd_search_detail)
@@ -318,7 +318,7 @@ def main():
     # compare
     sp_cmp = subparsers.add_parser("compare", help="Compare multiple courses")
     sp_cmp.add_argument("--codes", required=True, help="Comma-separated course codes")
-    sp_cmp.add_argument("--year", "-y", default="2025", help="年度")
+    sp_cmp.add_argument("--year", "-y", default="2026", help="年度")
     sp_cmp.set_defaults(func=cmd_compare)
 
     # conflicts
